@@ -74,12 +74,10 @@ import GeneralSettingsTab from './settings/GeneralSettingsTab'
 import AppearanceSettingsTab from './settings/AppearanceSettingsTab'
 import AgentSettingsTab from './settings/AgentSettingsTab'
 import SkillSettingsSection from './settings/SkillSettingsSection'
-import FontLicensesModal from './settings/FontLicensesModal'
 import CustomProviderModal from './settings/CustomProviderModal'
 import ProfileImportUrlModal, { type CopyImportUrlOptions } from './settings/ProfileImportUrlModal'
 import ZipDownloadRouteModal, { ZIP_DOWNLOAD_ROUTE_OPTIONS } from './settings/ZipDownloadRouteModal'
 import StorageInfoSection from './settings/StorageInfoSection'
-import AboutSettingsTab from './settings/AboutSettingsTab'
 import MarkdownRenderer from './MarkdownRenderer'
 
 const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
@@ -184,7 +182,6 @@ export default function SettingsModal() {
   const settingsScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const customProviderScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const zipDownloadRouteScrollBoundaryRef = useRef<HTMLDivElement>(null)
-  const fontLicensesScrollBoundaryRef = useRef<HTMLDivElement>(null)
   const tabScrollRef = useRef<HTMLDivElement>(null)
   // 各选项卡共用一个滚动容器，按选项卡记录滚动位置，切换时各自恢复
   const tabScrollTopsRef = useRef<Partial<Record<SettingsTab, number>>>({})
@@ -197,7 +194,6 @@ export default function SettingsModal() {
   const [profileMenuMaxHeight, setProfileMenuMaxHeight] = useState(DEFAULT_DROPDOWN_MAX_HEIGHT)
   const [showCustomProviderImport, setShowCustomProviderImport] = useState(false)
   const [showZipDownloadRouteManager, setShowZipDownloadRouteManager] = useState(false)
-  const [showFontLicenses, setShowFontLicenses] = useState(false)
   const [editingCustomProviderId, setEditingCustomProviderId] = useState<string | null>(null)
   const [customProviderJson, setCustomProviderJson] = useState(DEFAULT_CUSTOM_PROVIDER_JSON)
   const [customProviderImportError, setCustomProviderImportError] = useState<string | null>(null)
@@ -543,10 +539,6 @@ export default function SettingsModal() {
       setShowZipDownloadRouteManager(false)
       return
     }
-    if (showFontLicenses) {
-      setShowFontLicenses(false)
-      return
-    }
     const nextTimeout = Number(timeoutInput)
     const normalizedTimeout =
       timeoutInput.trim() === '' || Number.isNaN(nextTimeout)
@@ -647,9 +639,9 @@ export default function SettingsModal() {
   }
 
   useCloseOnEscape(showSettings && !dataTransferMode, handleClose)
-  // 从“关于”打开的更新弹窗叠在设置之上，需要放行它的滚动
+  // 更新弹窗叠在设置之上，需要放行它的滚动
   const updateModalOpen = useReleaseUpdates((s) => s.modalOpen)
-  usePreventBackgroundScroll(showSettings, updateModalOpen ? updateModalScrollRef : showZipDownloadRouteManager ? zipDownloadRouteScrollBoundaryRef : showFontLicenses ? fontLicensesScrollBoundaryRef : showCustomProviderImport ? customProviderScrollBoundaryRef : settingsScrollBoundaryRef)
+  usePreventBackgroundScroll(showSettings, updateModalOpen ? updateModalScrollRef : showZipDownloadRouteManager ? zipDownloadRouteScrollBoundaryRef : showCustomProviderImport ? customProviderScrollBoundaryRef : settingsScrollBoundaryRef)
 
   if (!showSettings) return null
 
@@ -1173,15 +1165,6 @@ export default function SettingsModal() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                 </svg>
                 数据管理
-              </button>
-              <button
-                onClick={() => setActiveTab('about')}
-                className={`whitespace-nowrap flex-shrink-0 flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-xl transition-colors ${activeTab === 'about' ? 'bg-white dark:bg-white/[0.08] shadow-sm text-blue-600 dark:text-blue-400 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/80 dark:hover:bg-white/[0.04]'}`}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                关于
               </button>
             </nav>
           </div>
@@ -1908,8 +1891,6 @@ export default function SettingsModal() {
             )}
 
             {activeTab === 'skill' && isTauri && <SkillSettingsSection />}
-
-            {activeTab === 'about' && <AboutSettingsTab onOpenFontLicenses={() => setShowFontLicenses(true)} />}
           </div>
         </div>
       </div>
@@ -1921,13 +1902,6 @@ export default function SettingsModal() {
             scrollBoundaryRef={zipDownloadRouteScrollBoundaryRef}
             onSetEnabled={setZipDownloadRouteEnabled}
             onClose={() => setShowZipDownloadRouteManager(false)}
-          />
-        )}
-
-        {showFontLicenses && (
-          <FontLicensesModal
-            scrollBoundaryRef={fontLicensesScrollBoundaryRef}
-            onClose={() => setShowFontLicenses(false)}
           />
         )}
 

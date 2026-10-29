@@ -9,10 +9,9 @@ import { APP_TITLE } from '../lib/appTitle'
 import { RELEASES_PAGE_URL, shouldShowUpdate } from '../lib/releaseUpdates'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import ViewportTooltip from './ViewportTooltip'
-import HelpModal from './HelpModal'
 import HistoryModal from './HistoryModal'
 import { useFavoriteCollectionTitle } from './FavoriteCollections'
-import { DesktopDownloadIcon, EditIcon, HelpCircleIcon, HistoryIcon, InstallIcon, SettingsIcon } from './icons'
+import { DesktopDownloadIcon, EditIcon, HistoryIcon, InstallIcon, SettingsIcon } from './icons'
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>
@@ -36,14 +35,12 @@ export default function Header() {
   const agentMobileHeaderVisible = useStore((s) => s.agentMobileHeaderVisible)
   const agentConversations = useStore((s) => s.agentConversations)
   const activeAgentConversationId = useStore((s) => s.activeAgentConversationId)
-  const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const activeConversation = agentConversations.find((item) => item.id === activeAgentConversationId)
   const favoriteCollectionTitle = useFavoriteCollectionTitle()
   const showFavoriteCollectionTitle = appMode === 'gallery' && Boolean(activeFavoriteCollectionId)
   const latestRelease = useReleaseUpdates((s) => s.releases[0])
   const hasUpdate = useReleaseUpdates((s) => shouldShowUpdate(s.releases[0], __APP_VERSION__, s.ignoredVersion))
-  const [showHelp, setShowHelp] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [isPwaInstalled, setIsPwaInstalled] = useState(isInstalledPwa)
   const [hintVisible, setHintVisible] = useState(false)
@@ -53,10 +50,9 @@ export default function Header() {
   const createConversation = useStore((s) => s.createAgentConversation)
   const privacyModeEpoch = useStore((s) => s.privacyModeEpoch)
   const [popupEpoch, setPopupEpoch] = useState(privacyModeEpoch)
-  // 进入隐私模式时在渲染中直接关闭帮助和历史弹窗；整个顶栏不重新挂载，保留已捕获的 PWA 安装事件
+  // 进入隐私模式时在渲染中直接关闭历史弹窗；整个顶栏不重新挂载，保留已捕获的 PWA 安装事件
   if (popupEpoch !== privacyModeEpoch) {
     setPopupEpoch(privacyModeEpoch)
-    setShowHelp(false)
     setShowHistoryModal(false)
   }
 
@@ -114,7 +110,6 @@ export default function Header() {
 
   const installTooltip = useTooltip()
   const clientTooltip = useTooltip()
-  const helpTooltip = useTooltip()
   const settingsTooltip = useTooltip()
 
   useEffect(() => {
@@ -325,24 +320,6 @@ export default function Header() {
             )}
             <div
               className="relative"
-              {...helpTooltip.handlers}
-            >
-              <button
-                onClick={() => {
-                  dismissAllTooltips()
-                  setShowHelp(true)
-                }}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
-                aria-label="操作指南"
-              >
-                <HelpCircleIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-              </button>
-              <ViewportTooltip visible={helpTooltip.visible} className="whitespace-nowrap">
-                操作指南
-              </ViewportTooltip>
-            </div>
-            <div
-              className="relative"
               {...settingsTooltip.handlers}
             >
               <button
@@ -394,7 +371,6 @@ export default function Header() {
           </div>
         </div>
       </div>
-      {showHelp && <HelpModal appMode={appMode} isFavoriteCollectionOverview={appMode === 'gallery' && filterFavorite && !activeFavoriteCollectionId} onClose={() => setShowHelp(false)} />}
     </>
   )
 }
