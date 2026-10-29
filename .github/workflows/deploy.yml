@@ -95,6 +95,8 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
+          VITE_APP_TITLE: ${{ vars.VITE_APP_TITLE }}
+          VITE_APP_ICON_URL: ${{ vars.VITE_APP_ICON_URL }}
           VITE_DEFAULT_API_URL: ${{ secrets.VITE_DEFAULT_API_URL }}
           VITE_LOCK_PRESET_CONFIG_PARAMS: ${{ vars.VITE_LOCK_PRESET_CONFIG_PARAMS }}
           VITE_PREVENT_PRESET_CONFIG_DELETION: ${{ vars.VITE_PREVENT_PRESET_CONFIG_DELETION }}

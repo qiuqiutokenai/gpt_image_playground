@@ -7,7 +7,7 @@ if [ -n "$API_URL" ]; then
 fi
 
 if [ "${DEFAULT_API_URL+x}" != "x" ]; then
-    DEFAULT_API_URL=${API_URL:-https://api.openai.com/v1}
+    DEFAULT_API_URL=${API_URL:-https://api.qiuqiutoken.net/v1}
 fi
 API_PROXY_URL=${API_PROXY_URL:-${API_URL:-https://api.openai.com/v1}}
 

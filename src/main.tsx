@@ -4,11 +4,17 @@ import { createRoot } from 'react-dom/client'
 import 'streamdown/styles.css'
 import 'katex/dist/katex.min.css'
 import './index.css'
+import { APP_TITLE } from './lib/appTitle'
 import { getProxySetting } from './lib/networkProxy'
+import { readRuntimeEnv } from './lib/runtimeEnv'
 import { installBrowserBehaviorGuards, installExternalLinkHandler, isTauri, TITLEBAR_HEIGHT } from './lib/platform'
 import { installTauriLog } from './lib/tauriLog'
 import { installTauriStorageFlush, loadTauriStorage } from './lib/tauriStorage'
 import { installMobileViewportGuards } from './lib/viewport'
+
+document.title = APP_TITLE
+const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')!
+icon.href = readRuntimeEnv(import.meta.env.VITE_APP_ICON_URL) || icon.href
 
 installMobileViewportGuards()
 

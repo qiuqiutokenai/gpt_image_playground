@@ -139,6 +139,33 @@ describe('normalizeSettings', () => {
 })
 
 describe('default API URL env', () => {
+  it('starts with QiuqiuToken selected and a separate official OpenAI profile', () => {
+    expect(DEFAULT_SETTINGS.profiles).toHaveLength(2)
+    expect(getActiveApiProfile(DEFAULT_SETTINGS)).toMatchObject({
+      name: '球球token',
+      baseUrl: 'https://api.qiuqiutoken.net/v1',
+      apiKey: '',
+    })
+    expect(DEFAULT_SETTINGS.profiles[1]).toMatchObject({
+      name: 'OpenAI官方入口',
+      baseUrl: 'https://api.openai.com/v1',
+      apiKey: '',
+      apiProxy: false,
+    })
+  })
+
+  it('preserves a configured official profile when importing settings', () => {
+    const current = normalizeSettings({
+      ...DEFAULT_SETTINGS,
+      profiles: DEFAULT_SETTINGS.profiles.map((profile) => profile.id === 'official-openai'
+        ? { ...profile, apiKey: 'official-key' }
+        : profile),
+    })
+    const merged = mergeImportedSettings(current, { baseUrl: 'https://example.com/v1', apiKey: 'imported-key' })
+
+    expect(merged.profiles.find((profile) => profile.id === 'official-openai')?.apiKey).toBe('official-key')
+  })
+
   it.each([undefined, 'runtime-image-model', ''])('uses runtime tool model %s only for new defaults, not old inputs', async (imageGenerationModel) => {
     vi.resetModules()
     const params = new URLSearchParams({ apiMode: 'responses' })
@@ -490,6 +517,7 @@ describe('mergeImportedSettings', () => {
   it('does not replace existing custom providers when only the default profile remains', () => {
     const current = normalizeSettings({
       ...DEFAULT_SETTINGS,
+      profiles: [DEFAULT_SETTINGS.profiles[0]],
       customProviders: [{
         id: 'custom-existing',
         name: 'Existing Provider',

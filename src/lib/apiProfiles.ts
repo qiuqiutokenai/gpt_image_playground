@@ -34,7 +34,7 @@ const DEFAULT_OPENAI_API_PROXY = readRuntimeEnv(import.meta.env.VITE_API_PROXY_A
 const DOCKER_DEPLOYMENT = readRuntimeEnv(import.meta.env.VITE_DOCKER_DEPLOYMENT) === 'true'
 const DEFAULT_API_URL_PATCH = isImportableConfigUrl(RAW_DEFAULT_API_URL)
   ? null
-  : parseDefaultApiUrl(RAW_DEFAULT_API_URL || (DOCKER_DEPLOYMENT && DEFAULT_OPENAI_API_PROXY ? '' : OPENAI_DEFAULT_BASE_URL))
+  : parseDefaultApiUrl(RAW_DEFAULT_API_URL || (DOCKER_DEPLOYMENT && DEFAULT_OPENAI_API_PROXY ? '' : 'https://api.qiuqiutoken.net/v1'))
 const DEFAULT_BASE_URL = DEFAULT_API_URL_PATCH?.baseUrl ?? ''
 export { DEFAULT_IMAGES_MODEL } from './imageModels'
 export const DEFAULT_RESPONSES_MODEL = 'gpt-6.1-sol'
@@ -376,7 +376,7 @@ export function createDefaultOpenAIProfile(overrides: Partial<ApiProfile> = {}):
 
   return {
     id: DEFAULT_OPENAI_PROFILE_ID,
-    name: DEFAULT_API_URL_PATCH?.name ?? '默认',
+    name: DEFAULT_API_URL_PATCH?.name ?? '球球token',
     provider: 'openai',
     baseUrl: DEFAULT_BASE_URL,
     apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
@@ -949,7 +949,7 @@ export function validateApiProfile(profile: ApiProfile): string | null {
 
 function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
   return profile.id === DEFAULT_OPENAI_PROFILE_ID &&
-    profile.name === '默认' &&
+    (profile.name === '球球token' || profile.name === '默认') &&
     profile.provider === 'openai' &&
     profile.baseUrl === DEFAULT_BASE_URL &&
     profile.apiKey === '' &&
@@ -967,7 +967,8 @@ function isDefaultOpenAIProfile(profile: ApiProfile): boolean {
 
 function hasOnlyDefaultProfiles(settings: AppSettings): boolean {
   return settings.customProviders.length === 0 &&
-    settings.profiles.length === 1 &&
+    (settings.profiles.length === 1 || (settings.profiles.length === 2 &&
+      JSON.stringify(settings.profiles[1]) === JSON.stringify(DEFAULT_SETTINGS.profiles[1]))) &&
     settings.activeProfileId === DEFAULT_OPENAI_PROFILE_ID &&
     isDefaultOpenAIProfile(settings.profiles[0])
 }
@@ -1313,7 +1314,24 @@ export function mergePresetImportedSettings(
 }
 
 export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
-  profiles: [createDefaultOpenAIProfile()],
+  profiles: [
+    createDefaultOpenAIProfile(),
+    createDefaultOpenAIProfile({
+      id: 'official-openai',
+      name: 'OpenAI官方入口',
+      baseUrl: OPENAI_DEFAULT_BASE_URL,
+      apiKey: '',
+      model: DEFAULT_IMAGES_MODEL,
+      imageGenerationModel: DEFAULT_IMAGES_MODEL,
+      apiMode: 'images',
+      reasoningEffort: undefined,
+      codexCli: false,
+      apiProxy: false,
+      streamImages: false,
+      streamPartialImages: DEFAULT_STREAM_PARTIAL_IMAGES,
+      transparentBackgroundMethod: 'api',
+    }),
+  ],
   baseUrl: DEFAULT_BASE_URL,
   apiKey: DEFAULT_API_URL_PATCH?.apiKey ?? '',
   model: DEFAULT_API_URL_PATCH?.model ?? (DEFAULT_API_URL_PATCH?.apiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL),

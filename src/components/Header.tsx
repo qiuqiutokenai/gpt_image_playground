@@ -5,6 +5,7 @@ import { useTooltip } from '../hooks/useTooltip'
 import { detectOs } from '../lib/announcements'
 import { getPageScroller, getPageScrollTop } from '../lib/pageScroll'
 import { isTauri } from '../lib/platform'
+import { APP_TITLE } from '../lib/appTitle'
 import { RELEASES_PAGE_URL, shouldShowUpdate } from '../lib/releaseUpdates'
 import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import ViewportTooltip from './ViewportTooltip'
@@ -183,22 +184,22 @@ export default function Header() {
                 <>
                   <span className="min-w-0 truncate text-[17px] font-bold tracking-tight text-gray-800 dark:text-gray-100 sm:hidden" title={favoriteCollectionTitle}>{favoriteCollectionTitle}</span>
                   <a
-                    href="https://github.com/CookSleep/gpt_image_playground"
+                    href="https://qiuqiutoken.net"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hidden text-lg font-bold tracking-tight text-gray-800 transition-colors hover:text-gray-600 dark:text-gray-100 dark:hover:text-gray-300 sm:inline"
                   >
-                    GPT Image Playground
+                    {APP_TITLE}
                   </a>
                 </>
               ) : (
                 <a
-                  href="https://github.com/CookSleep/gpt_image_playground"
+                  href="https://qiuqiutoken.net"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[17px] sm:text-lg font-bold tracking-tight text-gray-800 dark:text-gray-100 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 >
-                  GPT Image Playground
+                  {APP_TITLE}
                 </a>
               )}
               {/* 透明伪元素把点击区域扩大到 32px 以上，外观不变 */}

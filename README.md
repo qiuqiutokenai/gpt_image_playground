@@ -167,6 +167,10 @@
 
 ## 🚀 部署与使用
 
+本仓库为球球Token 定制版本，基于 [GPT Image Playground](https://github.com/CookSleep/gpt_image_playground) 修改。部署本版本请使用 `qiuqiutokenai/gpt_image_playground` 仓库和下方的镜像地址。
+
+默认网页标题与左上角标题为“球球Token - 同步生图”，左上角链接到 https://qiuqiutoken.net，浏览器图标使用球球Token 品牌图片。首次打开后，在“设置 → API 配置”中填写自己的 API Key；默认选中“球球token”（`https://api.qiuqiutoken.net/v1`），也可以切换到“OpenAI官方入口”（`https://api.openai.com/v1`）。已有用户保存的配置会保留。
+
 Windows 用户可以直接安装桌面客户端；网页版可以部署到 Vercel、GitHub Pages、Cloudflare Workers、Docker 或任意静态文件服务器。
 
 部署时可以通过环境变量 `VITE_DEFAULT_API_URL` 提供**预置配置**：部署端预先加入用户配置列表的 API 配置，格式与用户自建的配置相同，用户打开页面通常只需补充 API Key。
@@ -303,30 +307,69 @@ npm run deploy:cf
 <details>
 <summary><strong>🐳 方式五：Docker 部署</strong></summary>
 
-使用官方镜像在服务器或本地容器环境中运行。
+需要安装 Docker；使用 Compose 时还需安装 Docker Compose 插件。
+
+本仓库的镜像发布地址为 `ghcr.io/qiuqiutokenai/gpt_image_playground:latest`，支持 `linux/amd64` 和 `linux/arm64`。首次使用前，先按下方“通过 GitHub Actions 发布镜像”完成构建发布；如尚未发布，也可以直接从源码构建。
 
 **Docker CLI**
 
 ```bash
-docker run -d -p 8080:80 \
-  -e DEFAULT_API_URL=https://api.openai.com/v1 \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+docker pull ghcr.io/qiuqiutokenai/gpt_image_playground:latest
+docker run -d \
+  --name qiuqiu-image \
+  --restart unless-stopped \
+  -p 8080:80 \
+  ghcr.io/qiuqiutokenai/gpt_image_playground:latest
 ```
 
-使用 host 网络时加 `--network host`，修改监听端口用 `-e PORT=28080`。
+启动后访问 `http://localhost:8080`；远程部署时访问 `http://服务器IP:8080`，并放行对应端口。可用 `docker logs -f qiuqiu-image` 查看日志。正式域名可通过反向代理转发到该端口并配置 HTTPS。
+
+使用 host 网络时以 `--network host` 替代 `-p 8080:80`，修改监听端口用 `-e PORT=28080`。
 
 **Docker Compose**
+
+将下面内容保存为 `compose.yaml`。`environment` 中的值均为本版本默认值，可按需修改或省略：
 
 ```yaml
 services:
   gpt-image-playground:
-    image: ghcr.io/cooksleep/gpt_image_playground:latest
+    image: ghcr.io/qiuqiutokenai/gpt_image_playground:latest
     environment:
-      - DEFAULT_API_URL=https://api.openai.com/v1
+      APP_TITLE: "球球Token - 同步生图"
+      APP_ICON_URL: "https://static.qiuqiutoken.net/assets/brand-logo.B7wx4McX.png"
+      DEFAULT_API_URL: "https://api.qiuqiutoken.net/v1"
     ports:
       - "8080:80"
     restart: unless-stopped
 ```
+
+```bash
+docker compose up -d
+docker compose logs -f
+```
+
+Docker 的标题和图标在容器启动时读取。修改 `compose.yaml` 后执行 `docker compose up -d --force-recreate`，然后刷新网页；这些变量不需要重新构建镜像。API 配置保存在用户浏览器中，部署默认值不会覆盖用户已保存的设置。图片和历史记录也保存在浏览器中，无需给容器挂载数据卷；备份可在“设置 → 数据管理”中导出。
+
+**从源码构建镜像**
+
+在项目根目录执行：
+
+```bash
+docker build -f deploy/Dockerfile -t qiuqiu-image:local .
+docker run -d --name qiuqiu-image-local --restart unless-stopped -p 8080:80 qiuqiu-image:local
+```
+
+镜像构建会安装依赖并执行前端构建，宿主机无需安装 Node.js。若 8080 端口已被占用，可将 `-p 8080:80` 改为 `-p 8081:80`。
+
+**通过 GitHub Actions 发布镜像**
+
+1. 将代码推送到 `https://github.com/qiuqiutokenai/gpt_image_playground`，并启用仓库的 Actions。
+2. 在 **Actions → Build and Publish Docker Image → Run workflow** 中选择 `main` 并运行。仅推送 `main` 不会自动构建 Docker 镜像。
+3. 工作流通过自动提供的 `GITHUB_TOKEN` 登录 GHCR，已声明 `packages: write` 权限，无需配置 Docker Hub 账号或额外的镜像仓库密码；组织策略需允许工作流写入 Packages。
+4. 构建成功后，会发布 `latest`、`package.json` 中的完整版本号和主次版本号标签。例如版本为 `0.8.3` 时，标签为 `latest`、`0.8.3`、`0.8`。
+5. 如需免登录拉取，在 GitHub 对应 Package 的设置中将可见性设为 **Public**。私有镜像需要先使用具备读取该包权限的凭据登录 `ghcr.io`。
+
+也可通过推送新的 `v版本号` tag 发布。发布前需按 [AGENTS.md](AGENTS.md) 同步各处版本号、缓存版本和 `RELEASE.md`，完成构建及测试；配置了客户端签名私钥时，tag 发布会先等待客户端构建成功，再构建 Docker 镜像。手动运行 Docker 工作流可独立构建，默认分支会更新 `latest`；重建同一版本会覆盖对应版本标签。
 
 **挂载配置文件**
 
@@ -336,7 +379,7 @@ services:
 docker run -d -p 8080:80 \
   -v ./gpt-image-config.json:/config/gpt-image-config.json:ro \
   -e DEFAULT_API_URL=/config/gpt-image-config.json \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/qiuqiutokenai/gpt_image_playground:latest
 ```
 
 **Docker 专属变量**
@@ -365,32 +408,52 @@ docker run -d -p 8080:80 \
   -e API_PROXY_URL=https://real-api.example.com/v1 \
   -e ENABLE_API_PROXY=true \
   -e LOCK_API_PROXY=true \
-  ghcr.io/cooksleep/gpt_image_playground:latest
+  ghcr.io/qiuqiutokenai/gpt_image_playground:latest
 ```
 
 **更新方式**
 
-使用 `latest` 标签时，重新拉取镜像并重启即可（如 `docker compose pull && docker compose up -d`）。需要固定版本时使用版本号标签（如 `0.2.x`）。
+使用 Compose 更新：
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+使用 Docker CLI 时，先 `docker pull` 拉取新镜像，再停止并移除旧容器，用相同端口和环境变量重新创建；仅执行 `docker restart` 不会使用新镜像。需要固定版本时，将 `:latest` 换成已发布的完整版本标签。
 
 </details>
 
 <details>
 <summary><strong>💻 方式六：本地开发与静态构建</strong></summary>
 
+需要 Node.js 24 和 npm（与 Docker 构建环境一致）。先获取源码：
+
+```bash
+git clone https://github.com/qiuqiutokenai/gpt_image_playground.git
+cd gpt_image_playground
+```
+
 **1. 环境变量（可选）**
 
-在项目根目录新建 `.env.local`：
+在项目根目录新建 `.env.local`，以下为默认值，可按需覆盖：
 
 ```dotenv
-VITE_DEFAULT_API_URL=https://api.openai.com/v1
+VITE_APP_TITLE="球球Token - 同步生图"
+VITE_APP_ICON_URL=https://static.qiuqiutoken.net/assets/brand-logo.B7wx4McX.png
+VITE_DEFAULT_API_URL=https://api.qiuqiutoken.net/v1
 ```
+
+修改环境变量后需重启开发服务器；静态部署需重新构建。标题与图标留空时使用内置默认值。
 
 **2. 安装依赖并启动**
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
+
+访问终端显示的地址，默认是 `http://localhost:5173`。需要从其他设备访问时，使用 `npm run dev -- --host 0.0.0.0`，并放行开发服务器端口。
 
 **3. 本地开发跨域代理（可选）**
 
@@ -420,7 +483,14 @@ npm run mock:api
 npm run build
 ```
 
-产物位于 `dist/`，可部署到任意静态文件服务器（如 Nginx、Netlify）。
+产物位于 `dist/`，可部署到任意静态文件服务器（如 Nginx、Netlify）。本地预览构建结果与运行测试：
+
+```bash
+npm run preview -- --host 0.0.0.0
+npm test
+```
+
+预览默认地址为 `http://localhost:4173`。生产环境使用静态文件服务器或 Docker 部署。
 
 </details>
 
@@ -437,6 +507,8 @@ npm run build
 
 | 构建时变量 | Docker 变量 | 说明 |
 |------|------|------|
+| `VITE_APP_TITLE` | `APP_TITLE` | 网页标题与左上角标题，留空时为“球球Token - 同步生图”，左上角链接到 https://qiuqiutoken.net |
+| `VITE_APP_ICON_URL` | `APP_ICON_URL` | 浏览器标签页图标地址，留空时使用 `https://static.qiuqiutoken.net/assets/brand-logo.B7wx4McX.png` |
 | `VITE_DEFAULT_API_URL` | `DEFAULT_API_URL` | 预置配置，见下文 |
 | `VITE_LOCK_PRESET_CONFIG_PARAMS=true` | `LOCK_PRESET_CONFIG_PARAMS=true` | 锁定预置配置中除 API Key 外的参数，禁止编辑随预置引入的自定义供应商；当前锁定配置引用的供应商解除引用后才能删除 |
 | `VITE_PREVENT_PRESET_CONFIG_DELETION=true` | `PREVENT_PRESET_CONFIG_DELETION=true` | 禁止删除预置配置及随预置引入的自定义供应商，不锁定参数，普通配置不受影响 |
@@ -451,6 +523,8 @@ npm run build
 
 <a id="preset-config"></a>
 ## 📋 预置配置
+
+首次使用时，API 配置包含默认选中的“球球token”（`https://api.qiuqiutoken.net/v1`）和“OpenAI官方入口”（`https://api.openai.com/v1`）。已有用户保存的配置保持不变。
 
 `VITE_DEFAULT_API_URL` 支持三种写法。
 
