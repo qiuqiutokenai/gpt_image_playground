@@ -597,6 +597,7 @@ export function normalizeApiProfile(
     transparentBackgroundMethod: !nativeTransparentBackgroundUnavailable && (record.transparentBackgroundMethod === 'api' || record.transparentBackgroundMethod === 'local')
       ? record.transparentBackgroundMethod
       : defaults.transparentBackgroundMethod,
+    svgModel: typeof record.svgModel === 'string' && record.svgModel.trim() ? record.svgModel.trim() : undefined,
     providerDrafts: normalizeProviderDrafts(record.providerDrafts, customProviderIds, nativeTransparentProviderIds),
   }
 }
@@ -737,6 +738,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     persistInputOnRestart: typeof record.persistInputOnRestart === 'boolean' ? record.persistInputOnRestart : true,
     reuseTaskApiProfileTemporarily: typeof record.reuseTaskApiProfileTemporarily === 'boolean' ? record.reuseTaskApiProfileTemporarily : false,
     alwaysShowRetryButton: typeof record.alwaysShowRetryButton === 'boolean' ? record.alwaysShowRetryButton : false,
+    saveTasksToActiveFavoriteCollection: typeof record.saveTasksToActiveFavoriteCollection === 'boolean' ? record.saveTasksToActiveFavoriteCollection : true,
     retryMode: normalizeRetryMode(record.retryMode, record.alwaysShowRetryButton === true),
     allowPromptRewrite: typeof record.allowPromptRewrite === 'boolean' ? record.allowPromptRewrite : false,
     taskCompletionNotification: typeof record.taskCompletionNotification === 'boolean' ? record.taskCompletionNotification : false,
@@ -1158,6 +1160,7 @@ const PRESET_PROFILE_DEPLOYMENT_KEYS = [
   'streamImages',
   'streamPartialImages',
   'transparentBackgroundMethod',
+  'svgModel',
   'providerDrafts',
 ] as const
 
@@ -1346,6 +1349,7 @@ export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   persistInputOnRestart: true,
   reuseTaskApiProfileTemporarily: false,
   alwaysShowRetryButton: false,
+  saveTasksToActiveFavoriteCollection: true,
   retryMode: 'new',
   allowPromptRewrite: false,
   taskCompletionNotification: false,

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ApiProfile, AppSettings, BatchProgress, BatchPromptMode, TaskParams } from '../../types'
+import { GIF_FRAME_COUNT_RANGE, GIF_FRAME_DURATION_RANGE, IMAGE_COMPLEXITIES, type ApiProfile, type AppSettings, type BatchProgress, type BatchPromptMode, type ParamDisabledReasons, type TaskParams } from '../../types'
 import { DEFAULT_BATCH_PROMPT_CONCURRENCY, normalizeBatchPromptConcurrency } from '../../lib/batchPrompts'
 import { isTauri } from '../../lib/platform'
 import { dismissAllTooltips } from '../../lib/tooltipDismiss'
-import Select from '../Select'
+import Select, { type SelectOption } from '../Select'
 import ButtonTooltip from './buttonTooltip'
 import ParamPopoverChip, { CHIP_BASE_CLASS, CHIP_IDLE_CLASS } from './paramPopoverChip'
 
@@ -85,6 +85,49 @@ function ConcurrencyInput({ value, disabled, onCommit }: { value: number; disabl
   )
 }
 
+/** GIF 帧参数输入框：超出范围时取边界值，清空或无效时保留原值 */
+function GifParamInput({ value, range, onCommit }: {
+  value: number
+  range: { min: number; max: number }
+  onCommit: (value: number) => void
+}) {
+  const [input, setInput] = useState(String(value))
+  const latestRef = useRef({ input, value, onCommit })
+  latestRef.current = { input, value, onCommit }
+
+  const parse = (text: string, fallback: number) => {
+    const parsed = Number(text)
+    if (!text.trim() || !Number.isFinite(parsed)) return fallback
+    return Math.min(range.max, Math.max(range.min, Math.round(parsed)))
+  }
+
+  // 直接关闭弹层时输入框被卸载而不会触发 blur，卸载时补一次提交
+  useEffect(() => () => {
+    const latest = latestRef.current
+    const next = parse(latest.input, latest.value)
+    if (next !== latest.value) latest.onCommit(next)
+  }, [])
+
+  return (
+    <input
+      value={input}
+      onChange={(e) => setInput(e.target.value)}
+      onBlur={() => {
+        const next = parse(input, value)
+        setInput(String(next))
+        if (next !== value) onCommit(next)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      type="number"
+      min={range.min}
+      max={range.max}
+      className="w-28 px-3 py-1.5 rounded-xl border border-transparent bg-black/[0.04] dark:bg-white/[0.06] focus:border-blue-300 dark:focus:border-blue-500/50 focus:outline-none text-xs transition-all duration-200"
+    />
+  )
+}
+
 interface HintTooltipState {
   visible: boolean
   show: () => void
@@ -100,7 +143,6 @@ export default function InputParamsPanel({
   modelOptions,
   onModelChange,
   isFalProvider,
-  isFalTextToImage,
   displaySize,
   qualityOptions,
   selectClass,
@@ -116,6 +158,9 @@ export default function InputParamsPanel({
   commitOutputCompression,
   moderationHint,
   moderationDisabled,
+  complexityHint,
+  disabledReasons,
+  hasInputImages,
   agentAutoImageCount,
   outputImageLimit,
   nInput,
@@ -150,9 +195,8 @@ export default function InputParamsPanel({
   modelOptions: Array<{ label: string; value: string }>
   onModelChange: (model: string) => void
   isFalProvider: boolean
-  isFalTextToImage: boolean
   displaySize: string
-  qualityOptions: Array<{ label: string; value: string }>
+  qualityOptions: SelectOption[]
   selectClass: string
   transparentOutputAvailable: boolean
   showTransparentOutputControl: boolean
@@ -166,6 +210,9 @@ export default function InputParamsPanel({
   commitOutputCompression: () => void
   moderationHint: HintTooltipState
   moderationDisabled: boolean
+  complexityHint: HintTooltipState
+  disabledReasons: ParamDisabledReasons
+  hasInputImages: boolean
   agentAutoImageCount: boolean
   outputImageLimit: number
   nInput: string
@@ -195,8 +242,11 @@ export default function InputParamsPanel({
   onStopBatch: () => void
 }) {
   // 折叠时也展示弹层内每一项的当前值，不支持的参数不显示
+  const isGif = params.output_format === 'gif'
   const moreSummary = [
+    disabledReasons.complexity ? null : `复杂度 ${params.complexity}`,
     params.output_format.toUpperCase(),
+    isGif ? `${params.frame_count} 帧` : null,
     showTransparentOutputControl
       ? `透明 ${transparentOutputEnabled}`
       : compressionDisabled ? null : `压缩 ${outputCompressionInput || '默认'}`,
@@ -239,10 +289,8 @@ export default function InputParamsPanel({
           <span className="font-mono">{displaySize}</span>
         </button>
         <ButtonTooltip
-          visible={(isFalTextToImage || activeProfile.codexCli) && sizeHint.visible}
-          text={isFalTextToImage
-            ? <>fal.ai 的文生图模式不支持 <code className="rounded bg-white/10 px-1 py-0.5 font-mono">auto</code> 参数</>
-            : 'Codex CLI 不支持尺寸参数，此处设置仅基于提示词工程'}
+          visible={(Boolean(disabledReasons.autoSize) || activeProfile.codexCli) && sizeHint.visible}
+          text={disabledReasons.autoSize ?? 'Codex CLI 不支持尺寸参数，此处设置仅基于提示词工程'}
         />
       </div>
       <div
@@ -266,8 +314,8 @@ export default function InputParamsPanel({
           className={activeProfile.codexCli ? CHIP_DISABLED_CLASS : CHIP_CLASS}
         />
         <ButtonTooltip
-          visible={(activeProfile.codexCli || isFalProvider) && qualityHint.visible}
-          text={isFalProvider ? <>fal.ai 不支持 <code className="rounded bg-white/10 px-1 py-0.5 font-mono">auto</code> 质量参数</> : 'Codex CLI 不支持质量参数'}
+          visible={activeProfile.codexCli && qualityHint.visible}
+          text="Codex CLI 不支持质量参数"
         />
       </div>
       <label
@@ -313,6 +361,32 @@ export default function InputParamsPanel({
         <ButtonTooltip visible={streamConcurrentByN && streamConcurrentHint.visible && !nLimitHint.visible} text="数量大于 1 时会将多图生成拆分为并发单图" />
       </label>
       <ParamPopoverChip label="更多" summary={moreSummary} className="sm:min-w-[5rem]">
+            <div
+              className={ROW_CLASS}
+              onMouseEnter={complexityHint.show}
+              onMouseLeave={complexityHint.hide}
+              onTouchStart={complexityHint.startTouch}
+              onTouchEnd={complexityHint.clearTimer}
+              onTouchCancel={complexityHint.hide}
+              onClick={complexityHint.show}
+            >
+              <span className={ROW_LABEL_CLASS}>复杂度</span>
+              <div className="w-28">
+                <Select
+                  value={disabledReasons.complexity ? 'auto' : params.complexity}
+                  onChange={(val) => {
+                    if (!disabledReasons.complexity) setParams({ complexity: val as TaskParams['complexity'] })
+                  }}
+                  options={IMAGE_COMPLEXITIES.map((value) => ({ label: value, value }))}
+                  disabled={Boolean(disabledReasons.complexity)}
+                  className={disabledReasons.complexity ? CONTROL_DISABLED_CLASS : selectClass}
+                />
+              </div>
+              <ButtonTooltip
+                visible={Boolean(disabledReasons.complexity) && complexityHint.visible}
+                text={disabledReasons.complexity}
+              />
+            </div>
             <div className={ROW_CLASS}>
               <span className={ROW_LABEL_CLASS}>格式</span>
               <div className="w-28">
@@ -321,7 +395,7 @@ export default function InputParamsPanel({
                   onChange={(val) => {
                     setParams({
                       output_format: val as TaskParams['output_format'],
-                      ...(val === 'png' ? { output_compression: null } : {}),
+                      ...(val === 'png' || val === 'svg' || val === 'gif' ? { output_compression: null } : {}),
                       ...(val === 'jpeg' ? { transparent_output: false } : {}),
                     })
                   }}
@@ -329,11 +403,38 @@ export default function InputParamsPanel({
                     { label: 'PNG', value: 'png' },
                     { label: 'JPEG', value: 'jpeg' },
                     { label: 'WebP', value: 'webp' },
+                    { label: 'SVG', value: 'svg', disabledReason: disabledReasons.svg },
+                    { label: 'GIF', value: 'gif', disabledReason: disabledReasons.gif },
                   ]}
                   className={selectClass}
                 />
               </div>
             </div>
+            {hasInputImages && params.output_format === 'svg' && (
+              <p className="text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+                SVG 只能用于文生图，有参考图时无法提交
+              </p>
+            )}
+            {isGif && (
+              <>
+                <label className={ROW_CLASS}>
+                  <span className={ROW_LABEL_CLASS}>帧数</span>
+                  <GifParamInput
+                    value={params.frame_count}
+                    range={GIF_FRAME_COUNT_RANGE}
+                    onCommit={(frame_count) => setParams({ frame_count })}
+                  />
+                </label>
+                <label className={ROW_CLASS}>
+                  <span className={ROW_LABEL_CLASS}>每帧时长（ms）</span>
+                  <GifParamInput
+                    value={params.frame_duration_ms}
+                    range={GIF_FRAME_DURATION_RANGE}
+                    onCommit={(frame_duration_ms) => setParams({ frame_duration_ms })}
+                  />
+                </label>
+              </>
+            )}
             {showTransparentOutputControl && (
               <div
                 className={ROW_CLASS}
@@ -363,9 +464,10 @@ export default function InputParamsPanel({
                     onOpenChange={onTransparentOutputMenuOpenChange}
                   />
                 </div>
+                {/* SVG 和 GIF 只能用接口原生透明背景，没有可选的实现方式 */}
                 <ButtonTooltip
-                  visible={transparentOutputHint.visible}
-                  text="实现方式可在 设置 → API 配置 中选择"
+                  visible={transparentOutputHint.visible && params.output_format !== 'svg' && !isGif}
+                  text={<>实现方式可在<strong className="font-semibold">「设置 → API 配置」</strong>中选择</>}
                 />
               </div>
             )}
