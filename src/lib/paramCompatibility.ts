@@ -2,13 +2,19 @@ import { DEFAULT_PARAMS, type ApiProfile, type AppSettings, type ParamDisabledRe
 import { getActiveApiProfile, getCustomProviderDefinition, isOpenAICompatibleProvider } from './apiProfiles'
 import { customProviderSupportsNativeTransparentBackground } from './customProviderCapabilities'
 import { getImageModelFamily, isGptImage26PlusModel, isVectorOrAnimatedFormat, supportsExtendedQuality, supportsGptImage26Params } from './imageModels'
-import { getImageModelParams } from './imageModelParams'
+import { getImageModelParams, getSeedreamSize } from './imageModelParams'
 import { getImageSearchSupport, getImageThinkingSupport } from './imageSearch'
 import { normalizeCodexCliImageSize, normalizeImageSize } from './size'
 
 export const DEFAULT_FAL_IMAGE_SIZE = '1360x1024'
 export const MAX_FAL_OUTPUT_IMAGES = 4
 export const MAX_OPENAI_OUTPUT_IMAGES = 10
+
+export function getMaskDisabledReason(profile: ApiProfile, format?: TaskParams['output_format']) {
+  if (getImageModelFamily(profile)) return '当前模型不支持遮罩编辑'
+  if (format === 'gif') return 'GIF 不支持遮罩编辑'
+  return undefined
+}
 
 export function getTaskParamSupport(settings: AppSettings, profile: ApiProfile) {
   const provider = getCustomProviderDefinition(settings, profile.provider)
@@ -18,9 +24,11 @@ export function getTaskParamSupport(settings: AppSettings, profile: ApiProfile) 
   }
 }
 
-export function getOutputImageLimitForSettings(settings: AppSettings) {
+export function getOutputImageLimitForSettings(settings: AppSettings, format?: TaskParams['output_format']) {
   const profile = getActiveApiProfile(settings)
-  return profile.provider === 'fal' ? MAX_FAL_OUTPUT_IMAGES : MAX_OPENAI_OUTPUT_IMAGES
+  if (getImageModelFamily(profile) === 'seedream' && profile.provider !== 'fal') return 1
+  if (profile.provider === 'fal') return format === 'svg' ? 1 : MAX_FAL_OUTPUT_IMAGES
+  return MAX_OPENAI_OUTPUT_IMAGES
 }
 
 export function normalizeParamsForSettings(
@@ -38,6 +46,8 @@ export function normalizeParamsForSettings(
     google_search: undefined,
     image_search: undefined,
     thinking_level: undefined,
+    background: undefined,
+    watermark: undefined,
     n: Math.min(outputImageLimit, Math.max(1, params.n || DEFAULT_PARAMS.n)),
   }
 
@@ -45,6 +55,17 @@ export function normalizeParamsForSettings(
     const modelParams = getImageModelParams(activeProfile, params)
     const search = getImageSearchSupport(activeProfile, getCustomProviderDefinition(settings, activeProfile.provider))
     const thinking = getImageThinkingSupport(activeProfile, getCustomProviderDefinition(settings, activeProfile.provider))
+    if (getImageModelFamily(activeProfile) === 'seedream') {
+      const background = options.agent ? 'auto' : params.background ?? 'auto'
+      return {
+        ...nextParams, ...modelParams,
+        size: getSeedreamSize(activeProfile, params), quality: 'auto',
+        watermark: params.watermark ?? false,
+        background, transparent_output: background === 'transparent',
+        output_format: params.output_format === 'jpeg' && background !== 'transparent' ? 'jpeg' : 'png',
+        output_compression: null, moderation: 'auto', complexity: 'auto',
+      }
+    }
     return {
       ...nextParams, ...modelParams,
       google_search: search.googleSearch ? undefined : params.google_search,
@@ -72,8 +93,8 @@ export function normalizeParamsForSettings(
   const format = nextParams.output_format
   if ((format === 'svg' || format === 'gif') && disabled[format]) nextParams.output_format = DEFAULT_PARAMS.output_format
 
-  // fal.ai 生成 SVG 时只能一张，且只有一个队列请求，无法像 OpenAI 那样拆成并发单张
-  // if (activeProfile.provider === 'fal' && nextParams.output_format === 'svg') nextParams.n = 1
+  // 格式回退后按实际输出格式计算数量上限。
+  nextParams.n = Math.min(getOutputImageLimitForSettings(settings, nextParams.output_format), Math.max(1, params.n || DEFAULT_PARAMS.n))
 
   if (nextParams.output_format === 'png' || isVectorOrAnimatedFormat(nextParams.output_format)) {
     nextParams.output_compression = DEFAULT_PARAMS.output_compression
@@ -97,13 +118,12 @@ export function getParamDisabledReasons(profile: ApiProfile, options: { hasInput
     complexity: gptImage26 ? undefined
       : isResponses ? '当前图像模型不支持复杂度参数' : '当前模型不支持复杂度参数',
     gif,
-    // fal.ai 的 SVG 暂不开放，原因见 falAiImageApi 中的说明
-    svg: gif ?? (isFal ? 'fal.ai 暂不支持此格式' : undefined),
+    svg: gif ?? (isFal && options.hasInputImages ? 'fal.ai 的参考图编辑不支持 SVG' : undefined),
     autoQuality: isFal ? 'fal.ai 不支持 auto 质量参数' : undefined,
     extendedQuality: supportsExtendedQuality(profile) ? undefined
       : isFal && isGptImage26PlusModel(profile.model) ? 'fal.ai 的 GPT Image 2.6 最高只支持 high'
       : isResponses ? '当前图像模型不支持此质量' : '当前模型不支持此质量',
-    autoSize: isFal && !options.hasInputImages ? 'fal.ai 的文生图模式不支持自动尺寸' : undefined,
+    autoSize: isFal && !getImageModelFamily(profile) && !options.hasInputImages ? '当前模型的文生图模式不支持自动尺寸' : undefined,
   }
 }
 
